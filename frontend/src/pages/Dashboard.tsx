@@ -24,14 +24,15 @@ import {
   GripVertical,
   User,
   Building2,
-  DollarSign,
   Check,
+  ChevronDown,
+  MoreHorizontal,
 } from 'lucide-react';
 import { api } from '../api/client';
 import type { Pipeline, PipelineStage, Deal, Contact, Company } from '../types';
 import Modal from '../components/Modal';
 
-// ── Deal Card ─────────────────────────────────────────────────────────────────
+// ── HubSpot-style Deal Card ────────────────────────────────────────────────────
 function DealCard({
   deal,
   onEdit,
@@ -43,48 +44,84 @@ function DealCard({
   onDelete: (id: string) => void;
   isDragging?: boolean;
 }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+
   return (
     <div
-      className={`bg-white border border-gray-200 rounded-lg p-3 shadow-sm group ${
-        isDragging ? 'opacity-50' : ''
+      className={`bg-white border border-gray-200 rounded-lg group transition-shadow ${
+        isDragging ? 'opacity-40 shadow-2xl scale-105' : 'hover:shadow-md hover:border-gray-300'
       }`}
+      style={{ cursor: isDragging ? 'grabbing' : undefined }}
     >
-      <div className="flex items-start justify-between gap-2">
-        <p className="text-sm font-medium text-gray-900 flex-1 leading-snug">{deal.title}</p>
-        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+      {/* Card top accent — uses stage color via CSS var injected by parent */}
+      <div className="p-3">
+        <div className="flex items-start justify-between gap-2">
           <button
             onClick={() => onEdit(deal)}
-            className="p-1 text-gray-400 hover:text-blue-600 rounded"
+            className="text-sm font-semibold text-gray-900 text-left hover:text-blue-700 leading-snug flex-1"
           >
-            <Pencil size={13} />
+            {deal.title}
           </button>
-          <button
-            onClick={() => onDelete(deal.id)}
-            className="p-1 text-gray-400 hover:text-red-600 rounded"
-          >
-            <Trash2 size={13} />
-          </button>
-        </div>
-      </div>
-      {deal.value > 0 && (
-        <div className="flex items-center gap-1 mt-2 text-emerald-600 text-xs font-medium">
-          <DollarSign size={11} />
-          {deal.value.toLocaleString()}
-        </div>
-      )}
-      <div className="mt-2 flex flex-col gap-1">
-        {deal.contact && (
-          <div className="flex items-center gap-1 text-xs text-gray-500">
-            <User size={11} className="flex-shrink-0" />
-            <span className="truncate">{deal.contact.name}</span>
+
+          {/* Kebab menu */}
+          <div className="relative flex-shrink-0">
+            <button
+              onClick={() => setMenuOpen((v) => !v)}
+              className="p-1 text-gray-400 hover:text-gray-700 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              <MoreHorizontal size={14} />
+            </button>
+            {menuOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-10"
+                  onClick={() => setMenuOpen(false)}
+                />
+                <div className="absolute right-0 top-6 z-20 bg-white border border-gray-200 rounded-lg shadow-lg py-1 w-32 text-sm">
+                  <button
+                    onClick={() => { setMenuOpen(false); onEdit(deal); }}
+                    className="w-full text-left px-3 py-1.5 hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                  >
+                    <Pencil size={13} /> Edit
+                  </button>
+                  <button
+                    onClick={() => { setMenuOpen(false); onDelete(deal.id); }}
+                    className="w-full text-left px-3 py-1.5 hover:bg-red-50 flex items-center gap-2 text-red-600"
+                  >
+                    <Trash2 size={13} /> Delete
+                  </button>
+                </div>
+              </>
+            )}
           </div>
+        </div>
+
+        {/* Amount */}
+        {deal.value > 0 && (
+          <p className="mt-1 text-base font-bold text-gray-900">
+            ${deal.value.toLocaleString()}
+          </p>
         )}
-        {deal.company && (
-          <div className="flex items-center gap-1 text-xs text-gray-500">
-            <Building2 size={11} className="flex-shrink-0" />
-            <span className="truncate">{deal.company.name}</span>
-          </div>
-        )}
+
+        {/* Associations */}
+        <div className="mt-2.5 flex flex-col gap-1.5">
+          {deal.company && (
+            <div className="flex items-center gap-1.5 text-xs text-gray-500">
+              <div className="w-4 h-4 rounded bg-purple-100 flex items-center justify-center flex-shrink-0">
+                <Building2 size={10} className="text-purple-600" />
+              </div>
+              <span className="truncate font-medium text-gray-700">{deal.company.name}</span>
+            </div>
+          )}
+          {deal.contact && (
+            <div className="flex items-center gap-1.5 text-xs text-gray-500">
+              <div className="w-4 h-4 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                <User size={10} className="text-blue-600" />
+              </div>
+              <span className="truncate text-gray-600">{deal.contact.name}</span>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -118,7 +155,7 @@ function SortableDealCard({
   );
 }
 
-// ── Stage Column ──────────────────────────────────────────────────────────────
+// ── HubSpot-style Stage Column ─────────────────────────────────────────────────
 function StageColumn({
   stage,
   onAddDeal,
@@ -140,75 +177,95 @@ function StageColumn({
   });
 
   const totalValue = stage.deals.reduce((sum, d) => sum + (d.value || 0), 0);
+  const dealCount = stage.deals.length;
 
   return (
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={`flex-shrink-0 w-72 flex flex-col ${isDragging ? 'opacity-50' : ''}`}
+      className={`flex-shrink-0 w-64 flex flex-col ${isDragging ? 'opacity-40' : ''}`}
     >
-      <div className="bg-gray-100 rounded-xl flex flex-col h-full">
-        {/* Stage Header */}
-        <div className="flex items-center gap-2 px-3 py-2.5 border-b border-gray-200">
-          <button
-            {...attributes}
-            {...listeners}
-            className="text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing flex-shrink-0"
-          >
-            <GripVertical size={14} />
-          </button>
-          <div
-            className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-            style={{ backgroundColor: stage.color }}
-          />
-          <span className="font-semibold text-gray-800 text-sm flex-1 truncate">{stage.name}</span>
-          <span className="text-xs text-gray-500 bg-white px-1.5 py-0.5 rounded-full border border-gray-200">
-            {stage.deals.length}
-          </span>
-          <button
-            onClick={() => onEditStage(stage)}
-            className="text-gray-400 hover:text-blue-600 p-1 rounded transition-colors"
-          >
-            <Pencil size={13} />
-          </button>
-          <button
-            onClick={() => onDeleteStage(stage)}
-            className="text-gray-400 hover:text-red-600 p-1 rounded transition-colors"
-          >
-            <Trash2 size={13} />
-          </button>
-        </div>
+      {/* Stage header — HubSpot style with colored top bar */}
+      <div className="bg-white rounded-t-xl overflow-hidden border border-gray-200 border-b-0">
+        {/* Colored top accent bar */}
+        <div className="h-1.5 w-full" style={{ backgroundColor: stage.color }} />
 
-        {/* Deals */}
-        <SortableContext items={stage.deals.map((d) => d.id)}>
-          <div className="flex-1 p-2 space-y-2 overflow-y-auto min-h-[120px]">
-            {stage.deals.map((deal) => (
-              <SortableDealCard
-                key={deal.id}
-                deal={deal}
-                onEdit={onEditDeal}
-                onDelete={onDeleteDeal}
-              />
-            ))}
+        <div className="px-3 py-2.5">
+          {/* Stage name row */}
+          <div className="flex items-center gap-1.5">
+            <button
+              {...attributes}
+              {...listeners}
+              className="text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing flex-shrink-0 -ml-0.5"
+            >
+              <GripVertical size={14} />
+            </button>
+            <span
+              className="text-xs font-semibold uppercase tracking-wide flex-1 truncate"
+              style={{ color: stage.color }}
+            >
+              {stage.name}
+            </span>
+            <button
+              onClick={() => onEditStage(stage)}
+              className="p-1 text-gray-300 hover:text-gray-600 rounded transition-colors"
+              title="Edit stage"
+            >
+              <Pencil size={12} />
+            </button>
+            <button
+              onClick={() => onDeleteStage(stage)}
+              className="p-1 text-gray-300 hover:text-red-500 rounded transition-colors"
+              title="Delete stage"
+            >
+              <Trash2 size={12} />
+            </button>
           </div>
-        </SortableContext>
 
-        {/* Footer */}
-        <div className="p-2 border-t border-gray-200">
-          {totalValue > 0 && (
-            <p className="text-xs text-gray-500 text-center mb-1.5">
-              ${totalValue.toLocaleString()} total
-            </p>
-          )}
-          <button
-            onClick={() => onAddDeal(stage.id)}
-            className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-          >
-            <Plus size={13} />
-            Add deal
-          </button>
+          {/* Stats row */}
+          <div className="flex items-center justify-between mt-1.5">
+            <span className="text-xs text-gray-500">
+              {dealCount} deal{dealCount !== 1 ? 's' : ''}
+            </span>
+            {totalValue > 0 && (
+              <span className="text-xs font-semibold text-gray-800">
+                ${totalValue.toLocaleString()}
+              </span>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Deal cards area */}
+      <SortableContext items={stage.deals.map((d) => d.id)}>
+        <div
+          className="flex-1 border-x border-gray-200 bg-gray-50/60 p-2 space-y-2 overflow-y-auto"
+          style={{ minHeight: 200, maxHeight: 'calc(100vh - 280px)' }}
+        >
+          {stage.deals.length === 0 && (
+            <div className="flex flex-col items-center justify-center h-16 text-gray-300 text-xs">
+              Drop deals here
+            </div>
+          )}
+          {stage.deals.map((deal) => (
+            <SortableDealCard
+              key={deal.id}
+              deal={deal}
+              onEdit={onEditDeal}
+              onDelete={onDeleteDeal}
+            />
+          ))}
+        </div>
+      </SortableContext>
+
+      {/* Add deal footer */}
+      <button
+        onClick={() => onAddDeal(stage.id)}
+        className="flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium text-gray-500 hover:text-blue-600 bg-white border border-gray-200 border-t-0 rounded-b-xl hover:bg-blue-50 transition-colors w-full"
+      >
+        <Plus size={13} />
+        Add deal
+      </button>
     </div>
   );
 }
@@ -264,51 +321,53 @@ function DealForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label className="label">Deal Title *</label>
+        <label className="label">Deal Name *</label>
         <input
           className="input"
           value={form.title}
           onChange={(e) => setForm({ ...form, title: e.target.value })}
           required
-          placeholder="e.g. Enterprise contract"
+          autoFocus
+          placeholder="e.g. Enterprise contract Q4"
         />
       </div>
       <div>
-        <label className="label">Value ($)</label>
+        <label className="label">Amount ($)</label>
         <input
           type="number"
           min={0}
           className="input"
           value={form.value}
           onChange={(e) => setForm({ ...form, value: Number(e.target.value) })}
+          placeholder="0"
         />
       </div>
       <div>
-        <label className="label">Contact</label>
+        <label className="label">Associated Contact</label>
         <select
           className="input"
           value={form.contact_id}
           onChange={(e) => setForm({ ...form, contact_id: e.target.value })}
         >
-          <option value="">— none —</option>
+          <option value="">— No contact —</option>
           {contacts.map((c) => (
             <option key={c.id} value={c.id}>
-              {c.name}
+              {c.name}{c.company ? ` · ${c.company.name}` : ''}
             </option>
           ))}
         </select>
       </div>
       <div>
-        <label className="label">Company</label>
+        <label className="label">Associated Company</label>
         <select
           className="input"
           value={form.company_id}
           onChange={(e) => setForm({ ...form, company_id: e.target.value })}
         >
-          <option value="">— none —</option>
+          <option value="">— No company —</option>
           {companies.map((c) => (
             <option key={c.id} value={c.id}>
-              {c.name}
+              {c.name}{c.industry ? ` · ${c.industry}` : ''}
             </option>
           ))}
         </select>
@@ -318,17 +377,17 @@ function DealForm({
           Cancel
         </button>
         <button type="submit" disabled={saving} className="btn-primary">
-          {saving ? 'Saving…' : deal ? 'Update Deal' : 'Add Deal'}
+          {saving ? 'Saving…' : deal ? 'Update Deal' : 'Create Deal'}
         </button>
       </div>
     </form>
   );
 }
 
-// ── Stage Form ────────────────────────────────────────────────────────────────
+// ── Stage Form ─────────────────────────────────────────────────────────────────
 const STAGE_COLORS = [
-  '#3B82F6', '#10B981', '#F59E0B', '#EF4444',
-  '#8B5CF6', '#EC4899', '#14B8A6', '#F97316',
+  '#0091AE', '#00BDA5', '#6A78D1', '#F2547D',
+  '#FF7A59', '#F5C26B', '#99ACC2', '#516F90',
 ];
 
 function StageForm({
@@ -343,7 +402,7 @@ function StageForm({
   onClose: () => void;
 }) {
   const [name, setName] = useState(stage?.name ?? '');
-  const [color, setColor] = useState(stage?.color ?? '#3B82F6');
+  const [color, setColor] = useState(stage?.color ?? STAGE_COLORS[0]);
   const [saving, setSaving] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -370,26 +429,33 @@ function StageForm({
           value={name}
           onChange={(e) => setName(e.target.value)}
           required
-          placeholder="e.g. Qualified Lead"
+          autoFocus
+          placeholder="e.g. Proposal Sent"
         />
       </div>
       <div>
-        <label className="label">Color</label>
-        <div className="flex gap-2 flex-wrap">
+        <label className="label">Stage Color</label>
+        <div className="flex gap-2 flex-wrap mt-1">
           {STAGE_COLORS.map((c) => (
             <button
               key={c}
               type="button"
-              className="w-7 h-7 rounded-full border-2 transition-transform hover:scale-110 flex items-center justify-center"
+              className="w-8 h-8 rounded-full border-4 transition-transform hover:scale-110 flex items-center justify-center"
               style={{
                 backgroundColor: c,
-                borderColor: color === c ? '#1e40af' : 'transparent',
+                borderColor: color === c ? '#1e2a3b' : 'transparent',
+                boxShadow: color === c ? `0 0 0 2px white, 0 0 0 4px ${c}` : 'none',
               }}
               onClick={() => setColor(c)}
             >
-              {color === c && <Check size={12} className="text-white" />}
+              {color === c && <Check size={14} className="text-white" />}
             </button>
           ))}
+        </div>
+        {/* Preview */}
+        <div className="mt-3 flex items-center gap-2">
+          <div className="h-1 w-16 rounded-full" style={{ backgroundColor: color }} />
+          <span className="text-xs text-gray-500">Preview color</span>
         </div>
       </div>
       <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
@@ -404,28 +470,26 @@ function StageForm({
   );
 }
 
-// ── Main Dashboard ────────────────────────────────────────────────────────────
+// ── Main Dashboard ─────────────────────────────────────────────────────────────
 export default function Dashboard() {
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
   const [activePipelineId, setActivePipelineId] = useState<string>('');
   const [pipeline, setPipeline] = useState<Pipeline | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [pipelineDropdown, setPipelineDropdown] = useState(false);
 
   const [, setActiveDragId] = useState<string | null>(null);
   const [activeDragType, setActiveDragType] = useState<'deal' | 'stage' | null>(null);
   const [activeDragData, setActiveDragData] = useState<Deal | PipelineStage | null>(null);
 
-  // Modals
-  const [dealModal, setDealModal] = useState<{
-    open: boolean;
-    stageId: string;
-    deal?: Deal;
-  }>({ open: false, stageId: '' });
-  const [stageModal, setStageModal] = useState<{
-    open: boolean;
-    stage?: PipelineStage;
-  }>({ open: false });
+  const [dealModal, setDealModal] = useState<{ open: boolean; stageId: string; deal?: Deal }>({
+    open: false,
+    stageId: '',
+  });
+  const [stageModal, setStageModal] = useState<{ open: boolean; stage?: PipelineStage }>({
+    open: false,
+  });
   const [newPipelineModal, setNewPipelineModal] = useState(false);
   const [newPipelineName, setNewPipelineName] = useState('');
 
@@ -486,20 +550,17 @@ export default function Dashboard() {
 
     const activeDeal: Deal = activeData.deal;
 
-    // Find the target stage id
     let targetStageId: string | null = null;
     if (overData?.type === 'deal') {
       targetStageId = overData.deal.stage_id;
     } else if (overData?.type === 'stage') {
       targetStageId = overData.stage.id;
     } else {
-      // dropped on stage column area
       targetStageId = over.id as string;
     }
 
     if (!targetStageId || activeDeal.stage_id === targetStageId) return;
 
-    // Optimistically move deal between stages
     setPipeline((prev) => {
       if (!prev) return prev;
       const newStages = prev.stages.map((s) => {
@@ -507,10 +568,7 @@ export default function Dashboard() {
           return { ...s, deals: s.deals.filter((d) => d.id !== activeDeal.id) };
         }
         if (s.id === targetStageId) {
-          return {
-            ...s,
-            deals: [...s.deals, { ...activeDeal, stage_id: targetStageId! }],
-          };
+          return { ...s, deals: [...s.deals, { ...activeDeal, stage_id: targetStageId! }] };
         }
         return s;
       });
@@ -533,7 +591,6 @@ export default function Dashboard() {
     const activeData = active.data.current;
     const overData = over.data.current;
 
-    // Stage reordering
     if (activeData?.type === 'stage' && overData?.type === 'stage') {
       const oldIndex = pipeline.stages.findIndex((s) => s.id === active.id);
       const newIndex = pipeline.stages.findIndex((s) => s.id === over.id);
@@ -548,19 +605,15 @@ export default function Dashboard() {
       return;
     }
 
-    // Deal stage change — persist
     if (activeData?.type === 'deal') {
       const deal: Deal = activeData.deal;
-      // Find where the deal currently lives in our optimistic state
       const currentStage = pipeline.stages.find((s) => s.deals.some((d) => d.id === deal.id));
       if (currentStage && currentStage.id !== deal.stage_id) {
         await api.deals.update(deal.id, { stage_id: currentStage.id });
       } else {
-        // Check if stage changed via over target
         let targetStageId: string | null = null;
         if (overData?.type === 'deal') targetStageId = overData.deal.stage_id;
         else if (overData?.type === 'stage') targetStageId = overData.stage.id;
-
         if (targetStageId && targetStageId !== deal.stage_id) {
           await api.deals.update(deal.id, { stage_id: targetStageId });
           refresh();
@@ -590,10 +643,12 @@ export default function Dashboard() {
     const p = await api.pipelines.create({
       name: newPipelineName,
       stages: [
-        { name: 'Lead', color: '#3B82F6' },
-        { name: 'Qualified', color: '#10B981' },
-        { name: 'Proposal', color: '#F59E0B' },
-        { name: 'Won', color: '#10B981' },
+        { name: 'Appointment Scheduled', color: '#0091AE' },
+        { name: 'Qualified to Buy', color: '#00BDA5' },
+        { name: 'Presentation Scheduled', color: '#6A78D1' },
+        { name: 'Decision Maker Bought-In', color: '#F2547D' },
+        { name: 'Contract Sent', color: '#FF7A59' },
+        { name: 'Closed Won', color: '#00BDA5' },
       ],
     });
     setNewPipelineName('');
@@ -602,68 +657,130 @@ export default function Dashboard() {
     setActivePipelineId(p.id);
   };
 
+  const activePipeline = pipelines.find((p) => p.id === activePipelineId);
+  const totalDeals = pipeline?.stages.reduce((sum, s) => sum + s.deals.length, 0) ?? 0;
   const totalValue = pipeline?.stages.reduce(
     (sum, s) => sum + s.deals.reduce((ds, d) => ds + (d.value || 0), 0),
     0
   ) ?? 0;
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Top bar */}
-      <div className="bg-white border-b border-gray-200 px-6 py-3 flex items-center gap-4">
-        <div className="flex items-center gap-2 overflow-x-auto">
-          {pipelines.map((p) => (
+    <div className="flex flex-col h-full bg-gray-50">
+      {/* ── HubSpot-style top bar ── */}
+      <div className="bg-white border-b border-gray-200 px-6 pt-4 pb-0">
+        {/* Title row */}
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-3">
+            <h1 className="text-xl font-bold text-gray-900">Deals</h1>
+
+            {/* Pipeline selector dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setPipelineDropdown((v) => !v)}
+                className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-900 border border-gray-200 rounded-lg px-3 py-1.5 hover:border-gray-300 transition-colors bg-white"
+              >
+                <span className="font-medium">
+                  {activePipeline?.name ?? 'Select pipeline'}
+                </span>
+                <ChevronDown size={14} />
+              </button>
+              {pipelineDropdown && (
+                <>
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setPipelineDropdown(false)}
+                  />
+                  <div className="absolute left-0 top-9 z-20 bg-white border border-gray-200 rounded-xl shadow-xl py-1.5 w-56 text-sm">
+                    {pipelines.map((p) => (
+                      <button
+                        key={p.id}
+                        onClick={() => {
+                          setActivePipelineId(p.id);
+                          setPipelineDropdown(false);
+                        }}
+                        className={`w-full text-left px-4 py-2 hover:bg-gray-50 flex items-center justify-between ${
+                          p.id === activePipelineId ? 'text-blue-700 font-semibold' : 'text-gray-700'
+                        }`}
+                      >
+                        {p.name}
+                        {p.id === activePipelineId && <Check size={14} />}
+                      </button>
+                    ))}
+                    <div className="border-t border-gray-100 mt-1 pt-1">
+                      <button
+                        onClick={() => {
+                          setPipelineDropdown(false);
+                          setNewPipelineModal(true);
+                        }}
+                        className="w-full text-left px-4 py-2 hover:bg-blue-50 text-blue-600 flex items-center gap-2"
+                      >
+                        <Plus size={14} /> New pipeline
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center gap-2">
+            {pipeline && (
+              <>
+                <span className="text-sm text-gray-500 mr-2">
+                  <span className="font-semibold text-gray-900">{totalDeals}</span> deals ·{' '}
+                  <span className="font-semibold text-gray-900">${totalValue.toLocaleString()}</span>
+                </span>
+                <button
+                  onClick={() => setStageModal({ open: true })}
+                  className="btn-secondary text-xs py-1.5"
+                >
+                  <Plus size={13} /> Add stage
+                </button>
+              </>
+            )}
             <button
-              key={p.id}
-              onClick={() => setActivePipelineId(p.id)}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
-                activePipelineId === p.id
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
+              onClick={() => setNewPipelineModal(true)}
+              className="btn-primary text-xs py-1.5"
             >
-              {p.name}
+              <Plus size={13} /> Create deal
             </button>
-          ))}
-          <button
-            onClick={() => setNewPipelineModal(true)}
-            className="px-3 py-1.5 rounded-full text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-1 whitespace-nowrap transition-colors"
-          >
-            <Plus size={14} /> New Pipeline
-          </button>
+          </div>
         </div>
-        <div className="ml-auto flex items-center gap-3">
-          {pipeline && (
-            <span className="text-sm text-gray-500">
-              <span className="font-medium text-gray-900">${totalValue.toLocaleString()}</span>{' '}
-              total value
-            </span>
-          )}
-          {pipeline && (
-            <button
-              onClick={() => setStageModal({ open: true })}
-              className="btn-secondary text-xs"
-            >
-              <Plus size={13} /> Add Stage
-            </button>
-          )}
-        </div>
+
+        {/* Pipeline stage tabs — HubSpot shows a thin colored strip per stage at the header */}
+        {pipeline && (
+          <div className="flex gap-0 overflow-x-auto">
+            {pipeline.stages.map((s) => (
+              <div
+                key={s.id}
+                className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium border-b-2 whitespace-nowrap"
+                style={{ borderBottomColor: s.color, color: s.color }}
+              >
+                <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: s.color }} />
+                {s.name}
+                <span className="ml-1 text-xs opacity-70">({s.deals.length})</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Kanban board */}
+      {/* ── Kanban board ── */}
       <div className="flex-1 overflow-x-auto p-6">
         {!pipeline ? (
           <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-3">
-            <p className="text-lg">
+            <div className="text-5xl mb-2">📊</div>
+            <p className="text-lg font-medium text-gray-600">
               {pipelines.length === 0
-                ? 'Create your first pipeline to get started'
+                ? 'Create your first pipeline'
                 : 'Select a pipeline above'}
             </p>
+            <p className="text-sm text-gray-400">
+              Track deals through stages from prospect to close.
+            </p>
             {pipelines.length === 0 && (
-              <button
-                onClick={() => setNewPipelineModal(true)}
-                className="btn-primary"
-              >
+              <button onClick={() => setNewPipelineModal(true)} className="btn-primary mt-2">
                 <Plus size={16} /> Create Pipeline
               </button>
             )}
@@ -680,7 +797,7 @@ export default function Dashboard() {
               items={pipeline.stages.map((s) => s.id)}
               strategy={horizontalListSortingStrategy}
             >
-              <div className="flex gap-4 h-full items-start">
+              <div className="flex gap-4 h-full items-start pb-6">
                 {pipeline.stages.map((stage) => (
                   <StageColumn
                     key={stage.id}
@@ -694,12 +811,20 @@ export default function Dashboard() {
                     onDeleteStage={handleDeleteStage}
                   />
                 ))}
+
+                {/* Add stage button inline */}
+                <button
+                  onClick={() => setStageModal({ open: true })}
+                  className="flex-shrink-0 w-48 h-16 border-2 border-dashed border-gray-300 rounded-xl text-sm text-gray-400 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50/50 transition-all flex items-center justify-center gap-2 mt-6"
+                >
+                  <Plus size={16} /> Add Stage
+                </button>
               </div>
             </SortableContext>
 
             <DragOverlay>
               {activeDragType === 'deal' && activeDragData && 'title' in activeDragData && (
-                <div className="rotate-2 cursor-grabbing">
+                <div className="rotate-1 shadow-2xl w-64">
                   <DealCard
                     deal={activeDragData as Deal}
                     onEdit={() => {}}
@@ -715,7 +840,7 @@ export default function Dashboard() {
       {/* Deal modal */}
       {dealModal.open && pipeline && (
         <Modal
-          title={dealModal.deal ? 'Edit Deal' : 'Add Deal'}
+          title={dealModal.deal ? 'Edit Deal' : 'Create Deal'}
           onClose={() => setDealModal({ open: false, stageId: '' })}
         >
           <DealForm
@@ -755,7 +880,7 @@ export default function Dashboard() {
       {/* New pipeline modal */}
       {newPipelineModal && (
         <Modal
-          title="New Pipeline"
+          title="Create Pipeline"
           onClose={() => setNewPipelineModal(false)}
           size="sm"
         >
@@ -767,12 +892,12 @@ export default function Dashboard() {
                 value={newPipelineName}
                 onChange={(e) => setNewPipelineName(e.target.value)}
                 required
-                placeholder="e.g. Sales Pipeline"
                 autoFocus
+                placeholder="e.g. Sales Pipeline"
               />
             </div>
-            <p className="text-xs text-gray-500">
-              A default set of stages (Lead → Qualified → Proposal → Won) will be created.
+            <p className="text-xs text-gray-400 bg-gray-50 rounded-lg p-3">
+              A default set of HubSpot-style stages will be created. You can rename, reorder, or add stages afterwards.
             </p>
             <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
               <button
