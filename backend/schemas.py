@@ -20,6 +20,43 @@ class ContactRef(BaseModel):
         from_attributes = True
 
 
+# --- User ---
+
+class UserCreate(BaseModel):
+    username: str
+    password: str
+    role: str = "member"  # 'admin' | 'member'
+
+
+class UserUpdate(BaseModel):
+    password: Optional[str] = None
+    role: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+class UserResponse(BaseModel):
+    id: str
+    username: str
+    role: str
+    is_active: bool
+
+    class Config:
+        from_attributes = True
+
+
+# --- Auth ---
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+    user: UserResponse
+
+
 # --- Company ---
 
 class CompanyBase(BaseModel):
@@ -48,6 +85,7 @@ class CompanyUpdate(BaseModel):
 
 class CompanyResponse(CompanyBase):
     id: str
+    created_by: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -86,6 +124,7 @@ class ContactResponse(BaseModel):
     company_id: Optional[str] = None
     company: Optional[CompanyRef] = None
     custom_fields: Optional[Dict[str, Any]] = {}
+    created_by: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -100,6 +139,7 @@ class PropertyBase(BaseModel):
     entity_type: str  # contact, company, deal
     required: bool = False
     options: Optional[List[str]] = []
+    section: str = "details"  # 'summary' | 'details'
 
 
 class PropertyCreate(PropertyBase):
@@ -111,6 +151,7 @@ class PropertyUpdate(BaseModel):
     field_type: Optional[str] = None
     required: Optional[bool] = None
     options: Optional[List[str]] = None
+    section: Optional[str] = None
 
 
 class PropertyResponse(PropertyBase):
@@ -156,6 +197,8 @@ class DealBase(BaseModel):
     contact_id: Optional[str] = None
     company_id: Optional[str] = None
     custom_fields: Optional[Dict[str, Any]] = {}
+    status: str = "open"  # 'open' | 'won' | 'lost'
+    close_date: Optional[str] = None
 
 
 class DealCreate(DealBase):
@@ -169,6 +212,8 @@ class DealUpdate(BaseModel):
     contact_id: Optional[str] = None
     company_id: Optional[str] = None
     custom_fields: Optional[Dict[str, Any]] = None
+    status: Optional[str] = None
+    close_date: Optional[str] = None
 
 
 class DealResponse(BaseModel):
@@ -182,6 +227,9 @@ class DealResponse(BaseModel):
     contact: Optional[ContactRef] = None
     company: Optional[CompanyRef] = None
     custom_fields: Optional[Dict[str, Any]] = {}
+    status: str = "open"
+    close_date: Optional[str] = None
+    created_by: Optional[str] = None
 
     class Config:
         from_attributes = True

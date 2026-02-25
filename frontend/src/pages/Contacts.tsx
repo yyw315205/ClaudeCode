@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Plus, Pencil, Trash2, Users, Search, Building2, Mail, Phone } from 'lucide-react';
 import { api } from '../api/client';
+import { useAuth } from '../contexts/AuthContext';
 import type { Contact, Company, Property } from '../types';
 import Modal from '../components/Modal';
 
@@ -186,6 +187,7 @@ function ContactForm({
 }
 
 export default function Contacts() {
+  const { user, isAdmin } = useAuth();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
@@ -329,20 +331,22 @@ export default function Contacts() {
                       </td>
                     ))}
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-1 justify-end">
-                        <button
-                          onClick={() => setModal({ open: true, contact: c })}
-                          className="p-1.5 text-gray-400 hover:text-blue-600 rounded transition-colors hover:bg-blue-50"
-                        >
-                          <Pencil size={14} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(c)}
-                          className="p-1.5 text-gray-400 hover:text-red-600 rounded transition-colors hover:bg-red-50"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
+                      {(isAdmin || c.created_by === user?.id) && (
+                        <div className="flex items-center gap-1 justify-end">
+                          <button
+                            onClick={() => setModal({ open: true, contact: c })}
+                            className="p-1.5 text-gray-400 hover:text-blue-600 rounded transition-colors hover:bg-blue-50"
+                          >
+                            <Pencil size={14} />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(c)}
+                            className="p-1.5 text-gray-400 hover:text-red-600 rounded transition-colors hover:bg-red-50"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}

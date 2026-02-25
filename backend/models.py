@@ -8,6 +8,16 @@ def gen_uuid():
     return str(uuid.uuid4())
 
 
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    username = Column(String, unique=True, nullable=False)
+    hashed_password = Column(String, nullable=False)
+    role = Column(String, nullable=False, default="member")  # 'admin' | 'member'
+    is_active = Column(Boolean, default=True)
+
+
 class Company(Base):
     __tablename__ = "companies"
 
@@ -19,6 +29,7 @@ class Company(Base):
     email = Column(String)
     address = Column(String)
     custom_fields = Column(JSON, default={})
+    created_by = Column(String, ForeignKey("users.id"), nullable=True)
 
     contacts = relationship("Contact", back_populates="company")
     deals = relationship("Deal", back_populates="company")
@@ -34,6 +45,7 @@ class Contact(Base):
     title = Column(String)
     company_id = Column(String, ForeignKey("companies.id"), nullable=True)
     custom_fields = Column(JSON, default={})
+    created_by = Column(String, ForeignKey("users.id"), nullable=True)
 
     company = relationship("Company", back_populates="contacts")
     deals = relationship("Deal", back_populates="contact")
@@ -48,7 +60,8 @@ class Property(Base):
     field_type = Column(String, nullable=False)  # text, number, email, phone, url, date, select
     entity_type = Column(String, nullable=False)  # contact, company, deal
     required = Column(Boolean, default=False)
-    options = Column(JSON, default=[])  # for select type
+    options = Column(JSON, default=[])
+    section = Column(String, default="details")  # 'summary' | 'details'
 
 
 class Pipeline(Base):
@@ -90,6 +103,9 @@ class Deal(Base):
     contact_id = Column(String, ForeignKey("contacts.id"), nullable=True)
     company_id = Column(String, ForeignKey("companies.id"), nullable=True)
     custom_fields = Column(JSON, default={})
+    status = Column(String, default="open")  # 'open' | 'won' | 'lost'
+    close_date = Column(String, nullable=True)  # ISO date string
+    created_by = Column(String, ForeignKey("users.id"), nullable=True)
 
     pipeline = relationship("Pipeline", back_populates="deals")
     stage = relationship("PipelineStage", back_populates="deals")

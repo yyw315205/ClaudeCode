@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Plus, Pencil, Trash2, GitBranch } from 'lucide-react';
 import { api } from '../api/client';
+import { useAuth } from '../contexts/AuthContext';
 import type { Pipeline } from '../types';
 import Modal from '../components/Modal';
 import { useNavigate } from 'react-router-dom';
 
 export default function Pipelines() {
+  const { isAdmin } = useAuth();
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
   const [editModal, setEditModal] = useState<{ open: boolean; pipeline?: Pipeline }>({
     open: false,
@@ -70,9 +72,11 @@ export default function Pipelines() {
           <h1 className="text-2xl font-bold text-gray-900">Pipelines</h1>
           <p className="text-sm text-gray-500 mt-1">{pipelines.length} pipeline(s)</p>
         </div>
-        <button onClick={openCreate} className="btn-primary">
-          <Plus size={16} /> New Pipeline
-        </button>
+        {isAdmin && (
+          <button onClick={openCreate} className="btn-primary">
+            <Plus size={16} /> New Pipeline
+          </button>
+        )}
       </div>
 
       {pipelines.length === 0 ? (
@@ -80,9 +84,11 @@ export default function Pipelines() {
           <GitBranch size={40} className="mx-auto mb-3 opacity-40" />
           <p className="font-medium">No pipelines yet</p>
           <p className="text-sm mt-1">Create your first pipeline to start tracking deals.</p>
-          <button onClick={openCreate} className="btn-primary mt-4">
-            <Plus size={16} /> Create Pipeline
-          </button>
+          {isAdmin && (
+            <button onClick={openCreate} className="btn-primary mt-4">
+              <Plus size={16} /> Create Pipeline
+            </button>
+          )}
         </div>
       ) : (
         <div className="space-y-3">
@@ -130,18 +136,22 @@ export default function Pipelines() {
                   >
                     View Board
                   </button>
-                  <button
-                    onClick={() => openEdit(p)}
-                    className="p-2 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
-                  >
-                    <Pencil size={16} />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(p)}
-                    className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                  {isAdmin && (
+                    <>
+                      <button
+                        onClick={() => openEdit(p)}
+                        className="p-2 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
+                      >
+                        <Pencil size={16} />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(p)}
+                        className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             );

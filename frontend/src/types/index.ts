@@ -1,3 +1,10 @@
+export interface User {
+  id: string;
+  username: string;
+  role: 'admin' | 'member';
+  is_active: boolean;
+}
+
 export interface CompanyRef {
   id: string;
   name: string;
@@ -17,6 +24,7 @@ export interface Company {
   email?: string;
   address?: string;
   custom_fields?: Record<string, unknown>;
+  created_by?: string;
 }
 
 export interface Contact {
@@ -28,10 +36,13 @@ export interface Contact {
   company_id?: string;
   company?: CompanyRef;
   custom_fields?: Record<string, unknown>;
+  created_by?: string;
 }
 
 export type FieldType = 'text' | 'number' | 'email' | 'phone' | 'url' | 'date' | 'select';
 export type EntityType = 'contact' | 'company' | 'deal';
+export type DealStatus = 'open' | 'won' | 'lost';
+export type PropertySection = 'summary' | 'details';
 
 export interface Property {
   id: string;
@@ -41,6 +52,7 @@ export interface Property {
   entity_type: EntityType;
   required: boolean;
   options?: string[];
+  section: PropertySection;
 }
 
 export interface Deal {
@@ -54,6 +66,9 @@ export interface Deal {
   contact?: ContactRef;
   company?: CompanyRef;
   custom_fields?: Record<string, unknown>;
+  status: DealStatus;
+  close_date?: string;
+  created_by?: string;
 }
 
 export interface PipelineStage {
