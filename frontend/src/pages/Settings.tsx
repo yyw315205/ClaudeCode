@@ -279,6 +279,8 @@ function UsersTab() {
   const [saving, setSaving] = useState(false);
   const [pwdModal, setPwdModal] = useState<{ open: boolean; userId: string; username: string } | null>(null);
   const [newPwd, setNewPwd] = useState('');
+  const [renameModal, setRenameModal] = useState<{ open: boolean; userId: string; username: string } | null>(null);
+  const [newUsername, setNewUsername] = useState('');
 
   const load = async () => { setUsers(await api.users.list()); };
   useEffect(() => { load(); }, []);
@@ -308,6 +310,18 @@ function UsersTab() {
       await api.users.update(pwdModal.userId, { password: newPwd });
       setPwdModal(null);
       setNewPwd('');
+    } finally { setSaving(false); }
+  };
+
+  const handleRename = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!renameModal) return;
+    setSaving(true);
+    try {
+      await api.users.update(renameModal.userId, { username: newUsername });
+      setRenameModal(null);
+      setNewUsername('');
+      load();
     } finally { setSaving(false); }
   };
 
@@ -361,6 +375,10 @@ function UsersTab() {
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-1 justify-end">
+                    <button onClick={() => { setRenameModal({ open: true, userId: u.id, username: u.username }); setNewUsername(u.username); }}
+                      className="text-xs px-2 py-1 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors">
+                      Rename
+                    </button>
                     <button onClick={() => setPwdModal({ open: true, userId: u.id, username: u.username })}
                       className="text-xs px-2 py-1 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors">
                       Reset pwd
@@ -406,6 +424,22 @@ function UsersTab() {
             <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
               <button type="button" onClick={() => setModal({ open: false })} className="btn-secondary">Cancel</button>
               <button type="submit" disabled={saving} className="btn-primary">{saving ? 'Creating…' : 'Create User'}</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Rename user modal */}
+      {renameModal && (
+        <Modal title={`Rename user — ${renameModal.username}`} onClose={() => { setRenameModal(null); setNewUsername(''); }} size="sm">
+          <form onSubmit={handleRename} className="space-y-4">
+            <div>
+              <label className="label">New Username *</label>
+              <input className="input" value={newUsername} onChange={(e) => setNewUsername(e.target.value)} required autoFocus />
+            </div>
+            <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
+              <button type="button" onClick={() => { setRenameModal(null); setNewUsername(''); }} className="btn-secondary">Cancel</button>
+              <button type="submit" disabled={saving} className="btn-primary">{saving ? 'Saving…' : 'Rename'}</button>
             </div>
           </form>
         </Modal>

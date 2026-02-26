@@ -250,6 +250,11 @@ def update_user(
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    if payload.username is not None:
+        existing = db.query(models.User).filter(models.User.username == payload.username).first()
+        if existing and existing.id != user_id:
+            raise HTTPException(status_code=400, detail="Username already taken")
+        user.username = payload.username
     if payload.password is not None:
         user.hashed_password = hash_password(payload.password)
     if payload.role is not None:
