@@ -11,6 +11,8 @@
 | OS | Windows (exact version unconfirmed) |
 | Shell | Windows PowerShell |
 | Python launcher | `py` (NOT `python` — Microsoft Store alias blocks `python`) |
+| Python version | Python 3.13 |
+| Python executable | `C:\Users\prfav\AppData\Local\Programs\Python\Python313\python.exe` |
 | Project root | `C:\Users\prfav\ClaudeCode\` |
 | Backend path | `C:\Users\prfav\ClaudeCode\backend\` |
 | Database file | `C:\Users\prfav\ClaudeCode\backend\crm.db` (SQLite) |
@@ -62,6 +64,6 @@ The backend contains ONLY these Python files:
 ## Clarifying Questions Still Outstanding
 
 - [ ] Exact Windows version (Windows 10 / 11)?
-- [ ] Where is Python installed? Run `py -c "import sys; print(sys.executable)"` to confirm
+- [x] Python installed at `C:\Users\prfav\AppData\Local\Programs\Python\Python313\python.exe` (Python 3.13)
 - [ ] Is there a virtual environment (`.venv` folder) in the backend?
 - [ ] Frontend: where is it served from and how is it started?
