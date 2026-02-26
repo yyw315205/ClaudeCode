@@ -1,4 +1,4 @@
-# Environment Facts — Reference Before Any PowerShell Instructions
+# Environment Facts — Reference Before Any Commands
 
 **Last updated: 2026-02-26**
 
@@ -9,7 +9,7 @@
 | Fact | Value |
 |---|---|
 | OS | Windows (exact version unconfirmed) |
-| Shell | Windows PowerShell |
+| Shell | **Command Prompt (cmd.exe)** — NOT PowerShell. `Test-Path`, `$env:`, `Get-ChildItem`, etc. do NOT work. |
 | Python launcher | `py` (NOT `python` — Microsoft Store alias blocks `python`) |
 | Python version | Python 3.13 |
 | Python executable | `C:\Users\prfav\AppData\Local\Programs\Python\Python313\python.exe` |
@@ -17,6 +17,17 @@
 | Backend path | `C:\Users\prfav\ClaudeCode\backend\` |
 | Database file | `C:\Users\prfav\ClaudeCode\backend\crm.db` (SQLite) |
 | Frontend path | Unknown — confirm before referencing |
+
+---
+
+## Shell Command Rules
+
+- User is on **cmd.exe**, not PowerShell
+- Use `if exist` not `Test-Path`
+- Use `del` not `Remove-Item`
+- Use `dir` not `ls` or `Get-ChildItem`
+- Use `set VAR=value` not `$env:VAR = "value"`
+- Do NOT use PowerShell-only syntax
 
 ---
 
@@ -58,6 +69,7 @@ The backend contains ONLY these Python files:
 3. Do NOT write one-liners that import from non-existent modules
 4. Do NOT suggest module paths without first checking the actual files in the backend
 5. Always confirm file/module exists before referencing it in a command
+6. Do NOT use PowerShell syntax — user is on cmd.exe
 
 ---
 
@@ -65,5 +77,6 @@ The backend contains ONLY these Python files:
 
 - [ ] Exact Windows version (Windows 10 / 11)?
 - [x] Python installed at `C:\Users\prfav\AppData\Local\Programs\Python\Python313\python.exe` (Python 3.13)
+- [x] Shell confirmed as **cmd.exe** (not PowerShell)
 - [ ] Is there a virtual environment (`.venv` folder) in the backend?
 - [ ] Frontend: where is it served from and how is it started?
