@@ -82,6 +82,9 @@ def run_migrations():
         "ALTER TABLE contacts ADD COLUMN created_by VARCHAR",
         "ALTER TABLE companies ADD COLUMN created_by VARCHAR",
         "ALTER TABLE properties ADD COLUMN section VARCHAR DEFAULT 'details'",
+        # Migrate existing single-FK contacts/companies to junction tables
+        "INSERT OR IGNORE INTO deal_contacts (deal_id, contact_id) SELECT id, contact_id FROM deals WHERE contact_id IS NOT NULL",
+        "INSERT OR IGNORE INTO deal_companies (deal_id, company_id) SELECT id, company_id FROM deals WHERE company_id IS NOT NULL",
     ]
     with engine.connect() as conn:
         for sql in migrations:
@@ -89,7 +92,7 @@ def run_migrations():
                 conn.execute(text(sql))
                 conn.commit()
             except Exception:
-                pass  # Column already exists — safe to ignore
+                pass  # Column already exists or no rows — safe to ignore
 
 
 # ── App startup ────────────────────────────────────────────────────────────────
@@ -655,6 +658,15 @@ def create_deal(
 ):
     obj = models.Deal(id=gen_id(), created_by=current_user.id, **payload.dict())
     db.add(obj)
+    db.flush()
+    if obj.contact_id:
+        contact = db.query(models.Contact).filter(models.Contact.id == obj.contact_id).first()
+        if contact:
+            obj.linked_contacts.append(contact)
+    if obj.company_id:
+        company = db.query(models.Company).filter(models.Company.id == obj.company_id).first()
+        if company:
+            obj.linked_companies.append(company)
     db.commit()
     db.refresh(obj)
     return obj
@@ -702,3 +714,77 @@ def delete_deal(
     can_mutate(obj.created_by, current_user)
     db.delete(obj)
     db.commit()
+
+
+@app.post("/api/deals/{deal_id}/contacts/{contact_id}", status_code=201)
+def add_deal_contact(
+    deal_id: str,
+    contact_id: str,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    deal = db.query(models.Deal).filter(models.Deal.id == deal_id).first()
+    if not deal:
+        raise HTTPException(status_code=404, detail="Deal not found")
+    can_mutate(deal.created_by, current_user)
+    contact = db.query(models.Contact).filter(models.Contact.id == contact_id).first()
+    if not contact:
+        raise HTTPException(status_code=404, detail="Contact not found")
+    if contact not in deal.linked_contacts:
+        deal.linked_contacts.append(contact)
+        db.commit()
+    return {"ok": True}
+
+
+@app.delete("/api/deals/{deal_id}/contacts/{contact_id}", status_code=204)
+def remove_deal_contact(
+    deal_id: str,
+    contact_id: str,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    deal = db.query(models.Deal).filter(models.Deal.id == deal_id).first()
+    if not deal:
+        raise HTTPException(status_code=404, detail="Deal not found")
+    can_mutate(deal.created_by, current_user)
+    contact = db.query(models.Contact).filter(models.Contact.id == contact_id).first()
+    if contact and contact in deal.linked_contacts:
+        deal.linked_contacts.remove(contact)
+        db.commit()
+
+
+@app.post("/api/deals/{deal_id}/companies/{company_id}", status_code=201)
+def add_deal_company(
+    deal_id: str,
+    company_id: str,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    deal = db.query(models.Deal).filter(models.Deal.id == deal_id).first()
+    if not deal:
+        raise HTTPException(status_code=404, detail="Deal not found")
+    can_mutate(deal.created_by, current_user)
+    company = db.query(models.Company).filter(models.Company.id == company_id).first()
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+    if company not in deal.linked_companies:
+        deal.linked_companies.append(company)
+        db.commit()
+    return {"ok": True}
+
+
+@app.delete("/api/deals/{deal_id}/companies/{company_id}", status_code=204)
+def remove_deal_company(
+    deal_id: str,
+    company_id: str,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    deal = db.query(models.Deal).filter(models.Deal.id == deal_id).first()
+    if not deal:
+        raise HTTPException(status_code=404, detail="Deal not found")
+    can_mutate(deal.created_by, current_user)
+    company = db.query(models.Company).filter(models.Company.id == company_id).first()
+    if company and company in deal.linked_companies:
+        deal.linked_companies.remove(company)
+        db.commit()

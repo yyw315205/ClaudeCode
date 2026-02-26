@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
   X, ChevronDown, ChevronUp, Calendar, DollarSign,
-  User, Building2, CheckCircle2, XCircle, Circle,
+  User, Building2, CheckCircle2, XCircle, Circle, Plus,
 } from 'lucide-react';
 import { api } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
-import type { Deal, Contact, Company, Property, DealStatus, PipelineStage } from '../types';
+import type { Deal, Contact, Company, Property, DealStatus, PipelineStage, ContactRef, CompanyRef } from '../types';
 
 const STATUS_CONFIG: Record<DealStatus, { label: string; color: string; icon: React.ReactNode }> = {
   open: { label: 'Open', color: 'text-blue-700 bg-blue-50', icon: <Circle size={13} /> },
@@ -53,6 +53,101 @@ function FieldInput({
   );
 }
 
+// ── Linked entity multi-select (contacts or companies) ─────────────────────
+function LinkedEntitySelector<T extends ContactRef | CompanyRef>({
+  label,
+  icon,
+  linked,
+  all,
+  canEdit,
+  onAdd,
+  onRemove,
+  renderItem,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  linked: T[];
+  all: T[];
+  canEdit: boolean;
+  onAdd: (id: string) => void;
+  onRemove: (id: string) => void;
+  renderItem?: (item: T) => string;
+}) {
+  const [open, setOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const available = all.filter((item) => !linked.some((l) => l.id === item.id));
+  const getName = (item: T) => renderItem ? renderItem(item) : item.name;
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  return (
+    <div>
+      <label className="label flex items-center gap-1.5">
+        {icon} {label}
+      </label>
+      <div className="flex flex-wrap gap-1.5 mt-1 min-h-[32px]">
+        {linked.map((item) => (
+          <span
+            key={item.id}
+            className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 text-xs font-medium px-2.5 py-1 rounded-full border border-blue-100"
+          >
+            {item.name}
+            {canEdit && (
+              <button
+                onClick={() => onRemove(item.id)}
+                className="ml-0.5 text-blue-400 hover:text-blue-700 transition-colors"
+                title={`Remove ${item.name}`}
+              >
+                <X size={10} />
+              </button>
+            )}
+          </span>
+        ))}
+        {canEdit && (
+          <div className="relative" ref={dropdownRef}>
+            <button
+              onClick={() => setOpen((v) => !v)}
+              className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-blue-600 border border-dashed border-gray-300 hover:border-blue-400 rounded-full px-2.5 py-1 transition-colors"
+            >
+              <Plus size={10} /> Add
+            </button>
+            {open && (
+              <div className="absolute top-8 left-0 z-20 bg-white border border-gray-200 rounded-lg shadow-lg py-1 w-52 text-sm max-h-44 overflow-y-auto">
+                {available.length === 0 ? (
+                  <p className="px-3 py-2 text-gray-400 text-xs">No more to add</p>
+                ) : (
+                  available.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => { onAdd(item.id); setOpen(false); }}
+                      className="w-full text-left px-3 py-1.5 hover:bg-blue-50 text-gray-700 truncate"
+                    >
+                      {getName(item)}
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+        )}
+        {linked.length === 0 && !canEdit && (
+          <span className="text-xs text-gray-400">None</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function DealDrawer({
   deal,
   stages,
@@ -79,8 +174,6 @@ export default function DealDrawer({
     title: deal.title,
     value: String(deal.value),
     stage_id: deal.stage_id,
-    contact_id: deal.contact_id ?? '',
-    company_id: deal.company_id ?? '',
     status: deal.status,
     close_date: deal.close_date ?? '',
     ...Object.fromEntries(
@@ -90,7 +183,22 @@ export default function DealDrawer({
   const [saving, setSaving] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
 
+  // Linked contacts/companies (many-to-many)
+  const [linkedContacts, setLinkedContacts] = useState<ContactRef[]>(deal.linked_contacts ?? []);
+  const [linkedCompanies, setLinkedCompanies] = useState<CompanyRef[]>(deal.linked_companies ?? []);
+
   const set = (key: string, val: string) => setForm((f) => ({ ...f, [key]: val }));
+
+  // Sync stage_id when deal prop changes (e.g. after drag-and-drop)
+  useEffect(() => {
+    setForm((f) => ({ ...f, stage_id: deal.stage_id }));
+  }, [deal.stage_id]);
+
+  // Sync linked contacts/companies when deal prop changes
+  useEffect(() => {
+    setLinkedContacts(deal.linked_contacts ?? []);
+    setLinkedCompanies(deal.linked_companies ?? []);
+  }, [deal.id]);
 
   const summaryProps = properties.filter((p) => p.section === 'summary');
   const detailProps = properties.filter((p) => p.section === 'details');
@@ -107,8 +215,6 @@ export default function DealDrawer({
         title: form.title,
         value: Number(form.value) || 0,
         stage_id: form.stage_id,
-        contact_id: form.contact_id || undefined,
-        company_id: form.company_id || undefined,
         status: form.status as DealStatus,
         close_date: form.close_date || undefined,
         custom_fields,
@@ -124,6 +230,28 @@ export default function DealDrawer({
     if (!confirm(`Delete deal "${deal.title}"?`)) return;
     await api.deals.delete(deal.id);
     onDeleted();
+  };
+
+  const handleAddContact = async (contactId: string) => {
+    await api.deals.addContact(deal.id, contactId);
+    const contact = contacts.find((c) => c.id === contactId);
+    if (contact) setLinkedContacts((prev) => [...prev, { id: contact.id, name: contact.name }]);
+  };
+
+  const handleRemoveContact = async (contactId: string) => {
+    await api.deals.removeContact(deal.id, contactId);
+    setLinkedContacts((prev) => prev.filter((c) => c.id !== contactId));
+  };
+
+  const handleAddCompany = async (companyId: string) => {
+    await api.deals.addCompany(deal.id, companyId);
+    const company = companies.find((c) => c.id === companyId);
+    if (company) setLinkedCompanies((prev) => [...prev, { id: company.id, name: company.name }]);
+  };
+
+  const handleRemoveCompany = async (companyId: string) => {
+    await api.deals.removeCompany(deal.id, companyId);
+    setLinkedCompanies((prev) => prev.filter((c) => c.id !== companyId));
   };
 
   const currentStage = stages.find((s) => s.id === form.stage_id);
@@ -238,41 +366,27 @@ export default function DealDrawer({
             </div>
           </div>
 
-          {/* Contact + Company */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="label flex items-center gap-1.5">
-                <User size={13} className="text-gray-400" /> Contact
-              </label>
-              <select
-                className="input"
-                value={form.contact_id}
-                onChange={(e) => set('contact_id', e.target.value)}
-                disabled={!canEdit}
-              >
-                <option value="">— none —</option>
-                {contacts.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="label flex items-center gap-1.5">
-                <Building2 size={13} className="text-gray-400" /> Company
-              </label>
-              <select
-                className="input"
-                value={form.company_id}
-                onChange={(e) => set('company_id', e.target.value)}
-                disabled={!canEdit}
-              >
-                <option value="">— none —</option>
-                {companies.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            </div>
-          </div>
+          {/* Contacts (multi) */}
+          <LinkedEntitySelector
+            label="Contacts"
+            icon={<User size={13} className="text-gray-400" />}
+            linked={linkedContacts}
+            all={contacts}
+            canEdit={canEdit}
+            onAdd={handleAddContact}
+            onRemove={handleRemoveContact}
+          />
+
+          {/* Companies (multi) */}
+          <LinkedEntitySelector
+            label="Companies"
+            icon={<Building2 size={13} className="text-gray-400" />}
+            linked={linkedCompanies}
+            all={companies}
+            canEdit={canEdit}
+            onAdd={handleAddCompany}
+            onRemove={handleRemoveCompany}
+          />
 
           {/* Summary custom properties */}
           {summaryProps.length > 0 && (

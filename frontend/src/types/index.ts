@@ -65,6 +65,8 @@ export interface Deal {
   company_id?: string;
   contact?: ContactRef;
   company?: CompanyRef;
+  linked_contacts?: ContactRef[];
+  linked_companies?: CompanyRef[];
   custom_fields?: Record<string, unknown>;
   status: DealStatus;
   close_date?: string;

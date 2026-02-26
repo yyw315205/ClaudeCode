@@ -1,11 +1,27 @@
 import uuid
-from sqlalchemy import Column, String, Float, Integer, ForeignKey, Boolean, JSON
+from sqlalchemy import Column, String, Float, Integer, ForeignKey, Boolean, JSON, Table
 from sqlalchemy.orm import relationship
 from database import Base
 
 
 def gen_uuid():
     return str(uuid.uuid4())
+
+
+# Association tables for many-to-many deal ↔ contact/company
+deal_contacts_table = Table(
+    'deal_contacts',
+    Base.metadata,
+    Column('deal_id', String, ForeignKey('deals.id'), primary_key=True),
+    Column('contact_id', String, ForeignKey('contacts.id'), primary_key=True),
+)
+
+deal_companies_table = Table(
+    'deal_companies',
+    Base.metadata,
+    Column('deal_id', String, ForeignKey('deals.id'), primary_key=True),
+    Column('company_id', String, ForeignKey('companies.id'), primary_key=True),
+)
 
 
 class User(Base):
@@ -109,5 +125,7 @@ class Deal(Base):
 
     pipeline = relationship("Pipeline", back_populates="deals")
     stage = relationship("PipelineStage", back_populates="deals")
-    contact = relationship("Contact", back_populates="deals")
-    company = relationship("Company", back_populates="deals")
+    contact = relationship("Contact", back_populates="deals", foreign_keys=[contact_id])
+    company = relationship("Company", back_populates="deals", foreign_keys=[company_id])
+    linked_contacts = relationship("Contact", secondary=deal_contacts_table, lazy="subquery")
+    linked_companies = relationship("Company", secondary=deal_companies_table, lazy="subquery")

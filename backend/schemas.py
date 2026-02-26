@@ -227,6 +227,8 @@ class DealResponse(BaseModel):
     company_id: Optional[str] = None
     contact: Optional[ContactRef] = None
     company: Optional[CompanyRef] = None
+    linked_contacts: List[ContactRef] = []
+    linked_companies: List[CompanyRef] = []
     custom_fields: Optional[Dict[str, Any]] = {}
     status: str = "open"
     close_date: Optional[str] = None

@@ -120,10 +120,18 @@ export const api = {
   deals: {
     list: (pipeline_id?: string) =>
       request<Deal[]>(`/deals${pipeline_id ? `?pipeline_id=${pipeline_id}` : ''}`),
-    create: (data: Omit<Deal, 'id' | 'contact' | 'company' | 'created_by'>) =>
+    create: (data: Omit<Deal, 'id' | 'contact' | 'company' | 'linked_contacts' | 'linked_companies' | 'created_by'>) =>
       request<Deal>('/deals', { method: 'POST', body: JSON.stringify(data) }),
-    update: (id: string, data: Partial<Omit<Deal, 'id' | 'contact' | 'company' | 'created_by'>>) =>
+    update: (id: string, data: Partial<Omit<Deal, 'id' | 'contact' | 'company' | 'linked_contacts' | 'linked_companies' | 'created_by'>>) =>
       request<Deal>(`/deals/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     delete: (id: string) => request<void>(`/deals/${id}`, { method: 'DELETE' }),
+    addContact: (dealId: string, contactId: string) =>
+      request<void>(`/deals/${dealId}/contacts/${contactId}`, { method: 'POST' }),
+    removeContact: (dealId: string, contactId: string) =>
+      request<void>(`/deals/${dealId}/contacts/${contactId}`, { method: 'DELETE' }),
+    addCompany: (dealId: string, companyId: string) =>
+      request<void>(`/deals/${dealId}/companies/${companyId}`, { method: 'POST' }),
+    removeCompany: (dealId: string, companyId: string) =>
+      request<void>(`/deals/${dealId}/companies/${companyId}`, { method: 'DELETE' }),
   },
 };

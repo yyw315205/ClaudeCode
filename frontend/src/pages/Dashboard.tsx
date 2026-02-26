@@ -21,6 +21,7 @@ import {
   Plus, Pencil, Trash2, GripVertical, User, Building2,
   Check, ChevronDown, MoreHorizontal, Circle, CheckCircle2, XCircle,
 } from 'lucide-react';
+// Note: Pencil is still used for stage edit button
 import { api } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import type { Pipeline, PipelineStage, Deal, Contact, Company, Property } from '../types';
@@ -42,22 +43,23 @@ function DealCard({
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
+  const primaryCompany = deal.linked_companies?.[0] ?? deal.company;
+  const primaryContact = deal.linked_contacts?.[0] ?? deal.contact;
+
   return (
     <div
-      className={`bg-white border border-gray-200 rounded-lg group transition-shadow ${
+      onClick={() => onOpen(deal)}
+      className={`bg-white border border-gray-200 rounded-lg group transition-shadow cursor-pointer ${
         isDragging ? 'opacity-40 shadow-2xl scale-105' : 'hover:shadow-md hover:border-gray-300'
       }`}
     >
       <div className="p-3">
         <div className="flex items-start justify-between gap-2">
-          <button
-            onClick={() => onOpen(deal)}
-            className="text-sm font-semibold text-gray-900 text-left hover:text-blue-700 leading-snug flex-1"
-          >
+          <span className="text-sm font-semibold text-gray-900 text-left leading-snug flex-1 hover:text-blue-700">
             {deal.title}
-          </button>
+          </span>
           {canEdit && (
-            <div className="relative flex-shrink-0">
+            <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
               <button
                 onClick={() => setMenuOpen((v) => !v)}
                 className="p-1 text-gray-400 hover:text-gray-700 rounded opacity-0 group-hover:opacity-100 transition-opacity"
@@ -68,12 +70,6 @@ function DealCard({
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
                   <div className="absolute right-0 top-6 z-20 bg-white border border-gray-200 rounded-lg shadow-lg py-1 w-32 text-sm">
-                    <button
-                      onClick={() => { setMenuOpen(false); onOpen(deal); }}
-                      className="w-full text-left px-3 py-1.5 hover:bg-gray-50 flex items-center gap-2 text-gray-700"
-                    >
-                      <Pencil size={13} /> Edit
-                    </button>
                     <button
                       onClick={() => { setMenuOpen(false); onDelete(deal.id); }}
                       className="w-full text-left px-3 py-1.5 hover:bg-red-50 flex items-center gap-2 text-red-600"
@@ -95,20 +91,26 @@ function DealCard({
         </div>
 
         <div className="mt-2.5 flex flex-col gap-1.5">
-          {deal.company && (
+          {primaryCompany && (
             <div className="flex items-center gap-1.5 text-xs text-gray-500">
               <div className="w-4 h-4 rounded bg-purple-100 flex items-center justify-center flex-shrink-0">
                 <Building2 size={10} className="text-purple-600" />
               </div>
-              <span className="truncate font-medium text-gray-700">{deal.company.name}</span>
+              <span className="truncate font-medium text-gray-700">{primaryCompany.name}</span>
+              {(deal.linked_companies?.length ?? 0) > 1 && (
+                <span className="text-gray-400">+{(deal.linked_companies?.length ?? 1) - 1}</span>
+              )}
             </div>
           )}
-          {deal.contact && (
+          {primaryContact && (
             <div className="flex items-center gap-1.5 text-xs text-gray-500">
               <div className="w-4 h-4 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
                 <User size={10} className="text-blue-600" />
               </div>
-              <span className="truncate text-gray-600">{deal.contact.name}</span>
+              <span className="truncate text-gray-600">{primaryContact.name}</span>
+              {(deal.linked_contacts?.length ?? 0) > 1 && (
+                <span className="text-gray-400">+{(deal.linked_contacts?.length ?? 1) - 1}</span>
+              )}
             </div>
           )}
         </div>
@@ -131,7 +133,6 @@ function SortableDealCard({ deal, onOpen, onDelete, canEdit }: {
       style={{ transform: CSS.Transform.toString(transform), transition }}
       {...attributes}
       {...listeners}
-      className="cursor-grab active:cursor-grabbing"
     >
       <DealCard deal={deal} onOpen={onOpen} onDelete={onDelete} isDragging={isDragging} canEdit={canEdit} />
     </div>
@@ -394,6 +395,21 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => { if (activePipelineId) loadPipeline(activePipelineId); }, [activePipelineId, loadPipeline]);
+
+  // Sync drawerDeal stage when pipeline changes (e.g. after drag-and-drop)
+  useEffect(() => {
+    if (!pipeline) return;
+    setDrawerDeal((prev) => {
+      if (!prev) return null;
+      for (const stage of pipeline.stages) {
+        const found = stage.deals.find((d) => d.id === prev.id);
+        if (found && found.stage_id !== prev.stage_id) {
+          return { ...prev, stage_id: found.stage_id };
+        }
+      }
+      return prev;
+    });
+  }, [pipeline]);
 
   const refresh = () => { if (activePipelineId) loadPipeline(activePipelineId); };
 
