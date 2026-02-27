@@ -413,6 +413,14 @@ export default function Dashboard() {
 
   const refresh = () => { if (activePipelineId) loadPipeline(activePipelineId); };
 
+  const handleContactCreated = (contact: Contact) => {
+    setContacts((prev) => [...prev, contact]);
+  };
+
+  const handleCompanyCreated = (company: Company) => {
+    setCompanies((prev) => [...prev, company]);
+  };
+
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
     const data = active.data.current;
@@ -432,14 +440,18 @@ export default function Dashboard() {
     if (overData?.type === 'deal') targetStageId = overData.deal.stage_id;
     else if (overData?.type === 'stage') targetStageId = overData.stage.id;
     else targetStageId = over.id as string;
-    if (!targetStageId || activeDeal.stage_id === targetStageId) return;
+    if (!targetStageId) return;
     setPipeline((prev) => {
       if (!prev) return prev;
+      // Find the deal's CURRENT stage in the latest optimistic state (not the stale activeDeal.stage_id)
+      const sourceStage = prev.stages.find((s) => s.deals.some((d) => d.id === activeDeal.id));
+      if (!sourceStage || sourceStage.id === targetStageId) return prev;
+      const dealToMove = sourceStage.deals.find((d) => d.id === activeDeal.id)!;
       return {
         ...prev,
         stages: prev.stages.map((s) => {
-          if (s.id === activeDeal.stage_id) return { ...s, deals: s.deals.filter((d) => d.id !== activeDeal.id) };
-          if (s.id === targetStageId) return { ...s, deals: [...s.deals, { ...activeDeal, stage_id: targetStageId! }] };
+          if (s.id === sourceStage.id) return { ...s, deals: s.deals.filter((d) => d.id !== activeDeal.id) };
+          if (s.id === targetStageId) return { ...s, deals: [...s.deals, { ...dealToMove, stage_id: targetStageId! }] };
           return s;
         }),
       };
@@ -468,6 +480,7 @@ export default function Dashboard() {
       const currentStage = pipeline.stages.find((s) => s.deals.some((d) => d.id === deal.id));
       if (currentStage && currentStage.id !== deal.stage_id) {
         await api.deals.update(deal.id, { stage_id: currentStage.id });
+        refresh();
       } else {
         let targetStageId: string | null = null;
         if (overData?.type === 'deal') targetStageId = overData.deal.stage_id;
@@ -721,6 +734,8 @@ export default function Dashboard() {
           onClose={() => setDrawerDeal(null)}
           onSaved={() => { setDrawerDeal(null); refresh(); }}
           onDeleted={() => { setDrawerDeal(null); refresh(); }}
+          onContactCreated={handleContactCreated}
+          onCompanyCreated={handleCompanyCreated}
         />
       )}
     </div>

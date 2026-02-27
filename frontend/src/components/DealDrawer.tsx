@@ -62,6 +62,8 @@ function LinkedEntitySelector<T extends ContactRef | CompanyRef>({
   canEdit,
   onAdd,
   onRemove,
+  onCreateNew,
+  createNewLabel,
   renderItem,
 }: {
   label: string;
@@ -71,6 +73,8 @@ function LinkedEntitySelector<T extends ContactRef | CompanyRef>({
   canEdit: boolean;
   onAdd: (id: string) => void;
   onRemove: (id: string) => void;
+  onCreateNew?: () => void;
+  createNewLabel?: string;
   renderItem?: (item: T) => string;
 }) {
   const [open, setOpen] = useState(false);
@@ -122,19 +126,28 @@ function LinkedEntitySelector<T extends ContactRef | CompanyRef>({
               <Plus size={10} /> Add
             </button>
             {open && (
-              <div className="absolute top-8 left-0 z-20 bg-white border border-gray-200 rounded-lg shadow-lg py-1 w-52 text-sm max-h-44 overflow-y-auto">
-                {available.length === 0 ? (
+              <div className="absolute top-8 left-0 z-20 bg-white border border-gray-200 rounded-lg shadow-lg py-1 w-52 text-sm max-h-52 overflow-y-auto">
+                {available.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => { onAdd(item.id); setOpen(false); }}
+                    className="w-full text-left px-3 py-1.5 hover:bg-blue-50 text-gray-700 truncate"
+                  >
+                    {getName(item)}
+                  </button>
+                ))}
+                {available.length === 0 && !onCreateNew && (
                   <p className="px-3 py-2 text-gray-400 text-xs">No more to add</p>
-                ) : (
-                  available.map((item) => (
+                )}
+                {onCreateNew && (
+                  <div className={available.length > 0 ? 'border-t border-gray-100 mt-1 pt-1' : ''}>
                     <button
-                      key={item.id}
-                      onClick={() => { onAdd(item.id); setOpen(false); }}
-                      className="w-full text-left px-3 py-1.5 hover:bg-blue-50 text-gray-700 truncate"
+                      onClick={() => { onCreateNew(); setOpen(false); }}
+                      className="w-full text-left px-3 py-1.5 hover:bg-blue-50 text-blue-600 flex items-center gap-1.5"
                     >
-                      {getName(item)}
+                      <Plus size={10} /> {createNewLabel ?? 'Create new'}
                     </button>
-                  ))
+                  </div>
                 )}
               </div>
             )}
@@ -143,6 +156,69 @@ function LinkedEntitySelector<T extends ContactRef | CompanyRef>({
         {linked.length === 0 && !canEdit && (
           <span className="text-xs text-gray-400">None</span>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ── Quick-create mini modal ────────────────────────────────────────────────
+function QuickCreateModal({
+  title,
+  fields,
+  onSave,
+  onClose,
+}: {
+  title: string;
+  fields: { key: string; label: string; type?: string; required?: boolean }[];
+  onSave: (values: Record<string, string>) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [values, setValues] = useState<Record<string, string>>(
+    Object.fromEntries(fields.map((f) => [f.key, '']))
+  );
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await onSave(values);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
+      <div className="relative bg-white rounded-xl shadow-2xl w-80 p-5 z-10">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold text-gray-900">{title}</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700">
+            <X size={16} />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          {fields.map((f) => (
+            <div key={f.key}>
+              <label className="label">{f.label}{f.required && ' *'}</label>
+              <input
+                type={f.type ?? 'text'}
+                className="input"
+                value={values[f.key]}
+                onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
+                required={f.required}
+                autoFocus={fields.indexOf(f) === 0}
+              />
+            </div>
+          ))}
+          <div className="flex justify-end gap-2 pt-1">
+            <button type="button" onClick={onClose} className="btn-secondary text-sm">Cancel</button>
+            <button type="submit" disabled={saving} className="btn-primary text-sm">
+              {saving ? 'Creating…' : 'Create & Link'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
@@ -157,6 +233,8 @@ export default function DealDrawer({
   onClose,
   onSaved,
   onDeleted,
+  onContactCreated,
+  onCompanyCreated,
 }: {
   deal: Deal;
   stages: PipelineStage[];
@@ -166,6 +244,8 @@ export default function DealDrawer({
   onClose: () => void;
   onSaved: () => void;
   onDeleted: () => void;
+  onContactCreated?: (contact: Contact) => void;
+  onCompanyCreated?: (company: Company) => void;
 }) {
   const { user, isAdmin } = useAuth();
   const canEdit = isAdmin || deal.created_by === user?.id;
@@ -183,22 +263,34 @@ export default function DealDrawer({
   const [saving, setSaving] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
 
+  // Local copies of contacts/companies so new ones created here are immediately available
+  const [localContacts, setLocalContacts] = useState<Contact[]>(contacts);
+  const [localCompanies, setLocalCompanies] = useState<Company[]>(companies);
+
   // Linked contacts/companies (many-to-many)
   const [linkedContacts, setLinkedContacts] = useState<ContactRef[]>(deal.linked_contacts ?? []);
   const [linkedCompanies, setLinkedCompanies] = useState<CompanyRef[]>(deal.linked_companies ?? []);
 
+  // Quick-create modals
+  const [showCreateContact, setShowCreateContact] = useState(false);
+  const [showCreateCompany, setShowCreateCompany] = useState(false);
+
   const set = (key: string, val: string) => setForm((f) => ({ ...f, [key]: val }));
 
-  // Sync stage_id when deal prop changes (e.g. after drag-and-drop)
+  // Sync stage_id when deal prop changes (e.g. after drag-and-drop + refresh)
   useEffect(() => {
     setForm((f) => ({ ...f, stage_id: deal.stage_id }));
   }, [deal.stage_id]);
 
-  // Sync linked contacts/companies when deal prop changes
+  // Sync linked contacts/companies when deal changes
   useEffect(() => {
     setLinkedContacts(deal.linked_contacts ?? []);
     setLinkedCompanies(deal.linked_companies ?? []);
   }, [deal.id]);
+
+  // Keep local contacts/companies in sync with parent (new ones added externally)
+  useEffect(() => { setLocalContacts(contacts); }, [contacts]);
+  useEffect(() => { setLocalCompanies(companies); }, [companies]);
 
   const summaryProps = properties.filter((p) => p.section === 'summary');
   const detailProps = properties.filter((p) => p.section === 'details');
@@ -234,7 +326,7 @@ export default function DealDrawer({
 
   const handleAddContact = async (contactId: string) => {
     await api.deals.addContact(deal.id, contactId);
-    const contact = contacts.find((c) => c.id === contactId);
+    const contact = localContacts.find((c) => c.id === contactId);
     if (contact) setLinkedContacts((prev) => [...prev, { id: contact.id, name: contact.name }]);
   };
 
@@ -245,13 +337,34 @@ export default function DealDrawer({
 
   const handleAddCompany = async (companyId: string) => {
     await api.deals.addCompany(deal.id, companyId);
-    const company = companies.find((c) => c.id === companyId);
+    const company = localCompanies.find((c) => c.id === companyId);
     if (company) setLinkedCompanies((prev) => [...prev, { id: company.id, name: company.name }]);
   };
 
   const handleRemoveCompany = async (companyId: string) => {
     await api.deals.removeCompany(deal.id, companyId);
     setLinkedCompanies((prev) => prev.filter((c) => c.id !== companyId));
+  };
+
+  const handleQuickCreateContact = async (values: Record<string, string>) => {
+    const newContact = await api.contacts.create({
+      name: values.name,
+      email: values.email || undefined,
+    });
+    setLocalContacts((prev) => [...prev, newContact]);
+    setLinkedContacts((prev) => [...prev, { id: newContact.id, name: newContact.name }]);
+    await api.deals.addContact(deal.id, newContact.id);
+    onContactCreated?.(newContact);
+    setShowCreateContact(false);
+  };
+
+  const handleQuickCreateCompany = async (values: Record<string, string>) => {
+    const newCompany = await api.companies.create({ name: values.name });
+    setLocalCompanies((prev) => [...prev, newCompany]);
+    setLinkedCompanies((prev) => [...prev, { id: newCompany.id, name: newCompany.name }]);
+    await api.deals.addCompany(deal.id, newCompany.id);
+    onCompanyCreated?.(newCompany);
+    setShowCreateCompany(false);
   };
 
   const currentStage = stages.find((s) => s.id === form.stage_id);
@@ -371,10 +484,12 @@ export default function DealDrawer({
             label="Contacts"
             icon={<User size={13} className="text-gray-400" />}
             linked={linkedContacts}
-            all={contacts}
+            all={localContacts}
             canEdit={canEdit}
             onAdd={handleAddContact}
             onRemove={handleRemoveContact}
+            onCreateNew={canEdit ? () => setShowCreateContact(true) : undefined}
+            createNewLabel="Create new contact"
           />
 
           {/* Companies (multi) */}
@@ -382,10 +497,12 @@ export default function DealDrawer({
             label="Companies"
             icon={<Building2 size={13} className="text-gray-400" />}
             linked={linkedCompanies}
-            all={companies}
+            all={localCompanies}
             canEdit={canEdit}
             onAdd={handleAddCompany}
             onRemove={handleRemoveCompany}
+            onCreateNew={canEdit ? () => setShowCreateCompany(true) : undefined}
+            createNewLabel="Create new company"
           />
 
           {/* Summary custom properties */}
@@ -482,6 +599,31 @@ export default function DealDrawer({
           </div>
         )}
       </div>
+
+      {/* Quick-create contact modal */}
+      {showCreateContact && (
+        <QuickCreateModal
+          title="New Contact"
+          fields={[
+            { key: 'name', label: 'Full Name', required: true },
+            { key: 'email', label: 'Email', type: 'email' },
+          ]}
+          onSave={handleQuickCreateContact}
+          onClose={() => setShowCreateContact(false)}
+        />
+      )}
+
+      {/* Quick-create company modal */}
+      {showCreateCompany && (
+        <QuickCreateModal
+          title="New Company"
+          fields={[
+            { key: 'name', label: 'Company Name', required: true },
+          ]}
+          onSave={handleQuickCreateCompany}
+          onClose={() => setShowCreateCompany(false)}
+        />
+      )}
     </>
   );
 }

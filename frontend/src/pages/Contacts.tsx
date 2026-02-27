@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Plus, Pencil, Trash2, Users, Search, Building2, Mail, Phone } from 'lucide-react';
 import { api } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
-import type { Contact, Company, Property } from '../types';
+import type { Contact, Company, Property, Deal } from '../types';
 import Modal from '../components/Modal';
 
 function ContactForm({
@@ -191,19 +191,25 @@ export default function Contacts() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
+  const [deals, setDeals] = useState<Deal[]>([]);
   const [search, setSearch] = useState('');
   const [modal, setModal] = useState<{ open: boolean; contact?: Contact }>({ open: false });
 
   const load = async () => {
-    const [c, co, props] = await Promise.all([
+    const [c, co, props, d] = await Promise.all([
       api.contacts.list(),
       api.companies.list(),
       api.properties.list('contact'),
+      api.deals.list(),
     ]);
     setContacts(c);
     setCompanies(co);
     setProperties(props);
+    setDeals(d);
   };
+
+  const getLinkedDeals = (contactId: string) =>
+    deals.filter((d) => d.linked_contacts?.some((lc) => lc.id === contactId));
 
   useEffect(() => {
     load();
@@ -276,6 +282,7 @@ export default function Contacts() {
                       {p.name}
                     </th>
                   ))}
+                  <th className="text-left px-4 py-3 font-semibold text-gray-700">Deals</th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
@@ -330,6 +337,21 @@ export default function Contacts() {
                         )}
                       </td>
                     ))}
+                    <td className="px-4 py-3">
+                      {(() => {
+                        const linked = getLinkedDeals(c.id);
+                        return linked.length > 0 ? (
+                          <span
+                            className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full"
+                            title={linked.map((d) => d.title).join(', ')}
+                          >
+                            {linked.length} deal{linked.length !== 1 ? 's' : ''}
+                          </span>
+                        ) : (
+                          <span className="text-gray-300">—</span>
+                        );
+                      })()}
+                    </td>
                     <td className="px-4 py-3">
                       {(isAdmin || c.created_by === user?.id) && (
                         <div className="flex items-center gap-1 justify-end">
